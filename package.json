@@ -1,0 +1,15 @@
+{
+  "name": "tokenerc721",
+  "version": "1.0.0",
+  "description": "create a ERC721 tokens",
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "author": "George",
+  "license": "ISC",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^1.0.2",
+    "hardhat": "^2.10.1"
+  }
+}
