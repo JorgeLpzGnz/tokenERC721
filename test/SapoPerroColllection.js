@@ -6,7 +6,7 @@ const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("SapoPerroCollection", function () {
+
 
   async function createContract() {
 
@@ -26,6 +26,8 @@ describe("SapoPerroCollection", function () {
 
   }
 
+describe("SapoPerroCollection", function () {
+
   describe('constructor', async() => {
 
     it('shuld init token Id Counter', async() => {
@@ -44,7 +46,7 @@ describe("SapoPerroCollection", function () {
 
     })
 
-    it('shuld set the mint Const', async() => {
+    it('shuld set the mint Cost', async() => {
 
       const {  mintCost } = await loadFixture( createContract )
 
@@ -52,6 +54,74 @@ describe("SapoPerroCollection", function () {
 
     })
 
+  })
+
+  describe("whitelist", async() => {
+
+    describe('adding', async() => {
+
+      it('should fail if addres is already on the whitelist', async() => {
+  
+        const { deploySp, account } = await loadFixture( createContract )
+  
+        await deploySp.addToWhiteList( account.address )
+  
+        await expect( deploySp.addToWhiteList( account.address )).to.be.revertedWith('Addres is already in the whitelist')
+  
+      })
+  
+      it("it should return false when address wasn't added", async() => {
+  
+        const { deploySp, owner, account } = await loadFixture( createContract )
+  
+        expect( await deploySp.whiteList( owner.address ) ).to.equal( false )
+  
+        expect( await deploySp.whiteList( account.address ) ).to.equal( false )
+  
+      })
+  
+      it("should add an address to white list", async() => {
+  
+        const { deploySp, owner, account } = await loadFixture( createContract )
+  
+        await deploySp.addToWhiteList( owner.address )
+  
+        await deploySp.addToWhiteList( account.address )
+  
+        expect( await deploySp.whiteList( owner.address )).to.equal( true )
+  
+        expect( await deploySp.whiteList( account.address )).to.equal( true )
+  
+      })
+
+    })
+
+    describe('deleting', async() => {
+
+      it("sholud fail if address isn't in the whitelist", async() => {
+
+        const { deploySp, account } = await loadFixture( createContract )
+
+        await expect( deploySp.deleteToWhiteList( account.address )).to.be.revertedWith("Address not found")
+
+      })
+
+      it("it should delete a whitelist address", async() => {
+
+        const { deploySp, account } = await loadFixture( createContract )
+
+        await deploySp.addToWhiteList( account.address )
+
+        expect( await deploySp.whiteList( account.address )).to.equal( true )
+
+        await deploySp.deleteToWhiteList( account.address )
+
+        expect( await deploySp.whiteList( account.address )).to.equal( false )
+
+      })
+
+    })
+    
   })
 
   describe('SetBaseUri', async() => {
@@ -62,7 +132,7 @@ describe("SapoPerroCollection", function () {
 
       const newBaseUri = 'hola'
 
-      await expect( deploySp.connect(account).setBaseUri(newBaseUri)).to.be.reverted
+      await expect( deploySp.connect( account ).setBaseUri(newBaseUri)).to.be.reverted
 
     })
 
@@ -84,17 +154,19 @@ describe("SapoPerroCollection", function () {
 
     it("should fail when the token wasn't minted", async() => {
 
-      const { deploySp } = await loadFixture( createContract )
+      const { deploySp, tokenIdCounter } = await loadFixture( createContract )
 
-      await expect( deploySp.tokenURI(1)).to.be.revertedWith("token dosn't exist")
+      await expect( deploySp.tokenURI( tokenIdCounter )).to.be.revertedWith("token dosn't exist")
 
     })
 
     it('should return token Uri', async() => {
 
-      const { deploySp, mintCost, tokenIdCounter } = await loadFixture( createContract )
+      const { deploySp, mintCost, tokenIdCounter, account } = await loadFixture( createContract )
 
-      await deploySp.mintSapoPerro( 1, { value: mintCost} )
+      await deploySp.addToWhiteList( account.address )
+
+      await deploySp.connect( account ).mintSapoPerro( 1, { value: mintCost} )
 
       const mintedTokenId = tokenIdCounter.toNumber()
 
@@ -120,33 +192,56 @@ describe("SapoPerroCollection", function () {
 
     })
 
-    it('should fail when every token was minted', async() => {
+    it('should fail when try to mint more than nftMaxperTransation', async() => {
 
       const { deploySp, mintCost } = await loadFixture( createContract )
 
-      for( let i = 0; i < 20; i++) await deploySp.mintSapoPerro( 500, { value: mintCost.mul(500)} )
+      await expect( deploySp.mintSapoPerro( 21, { value: mintCost.mul(21)} )).to.be.revertedWith("can't mint more than 20 tokens per transation")
 
-      await expect( deploySp.mintSapoPerro( 1, { value: mintCost} )).to.be.revertedWith("Sold Out")
+    })
+
+
+
+    it("should fail is address ins't on whitelist", async() => {
+      
+      const { deploySp, mintCost } = await loadFixture( createContract )
+
+      await expect( deploySp.mintSapoPerro( 1, { value: mintCost })).to.be.revertedWith('Your not in the white list')
+    })
+
+    it('should fail when every token was minted', async() => {
+
+      const { deploySp, mintCost, account } = await loadFixture( createContract )
+
+      await deploySp.addToWhiteList( account.address )
+
+      for( let i = 0; i < 500; i++) await deploySp.connect( account ).mintSapoPerro( 20, { value: mintCost.mul(20)} )
+
+      await expect( deploySp.connect( account ).mintSapoPerro( 1, { value: mintCost} )).to.be.revertedWith("Sold Out")
 
     })
 
     it('should mint a NFT', async() => {
 
-      const { deploySp, mintCost, tokenIdCounter } = await loadFixture( createContract )
+      const { deploySp, mintCost, tokenIdCounter, account } = await loadFixture( createContract )
 
-      await deploySp.mintSapoPerro( 1, { value: mintCost} )
+      await deploySp.addToWhiteList( account.address )
 
-      expect( await deploySp.tokenURI(tokenIdCounter)).to.equal( '1.json' )
+      await deploySp.connect( account ).mintSapoPerro( 1, { value: mintCost} )
+
+      expect( await deploySp.connect( account ).tokenURI(tokenIdCounter)).to.equal( '1.json' )
 
     })
 
     it("should check if the funds are added correctly", async() => {
 
-      const { deploySp, mintCost, provider } = await loadFixture( createContract )
+      const { deploySp, mintCost, provider, account } = await loadFixture( createContract )
       
       const balanceBeforeMint = await provider.getBalance(deploySp.address)
 
-      await deploySp.mintSapoPerro( 1, { value: mintCost} )
+      await deploySp.addToWhiteList( account.address )
+
+      await deploySp.connect( account ).mintSapoPerro( 1, { value: mintCost} )
       
       const balanceAfterMint = await provider.getBalance( deploySp.address )
 
@@ -162,7 +257,7 @@ describe("SapoPerroCollection", function () {
 
       const { deploySp, account } = await loadFixture( createContract )
 
-      await expect( deploySp.connect(account).withdraw()).to.be.reverted
+      await expect( deploySp.connect( account ).withdraw()).to.be.reverted
 
     })
 
@@ -176,9 +271,11 @@ describe("SapoPerroCollection", function () {
 
     it("should check if the funds are withdrawn correctly", async() => {
 
-      const { deploySp, mintCost, provider } = await loadFixture( createContract )
+      const { deploySp, mintCost, provider, account } = await loadFixture( createContract )
 
-      await deploySp.mintSapoPerro( 50, { value: mintCost.mul(50) } )
+      await deploySp.addToWhiteList( account.address )
+
+      await deploySp.connect( account ).mintSapoPerro( 20, { value: mintCost.mul(20)} )
       
       const balanceAfterMint = await provider.getBalance( deploySp.address )
 
@@ -200,7 +297,9 @@ describe("SapoPerroCollection", function () {
 
       const { deploySp, mintCost, account, tokenIdCounter } = await loadFixture( createContract )
 
-      expect( await deploySp.connect(account).mintSapoPerro( 1, { value: mintCost} ))
+      await deploySp.addToWhiteList( account.address )
+
+      expect( await deploySp.connect( account ).mintSapoPerro( 1, { value: mintCost} ))
         .to.emit( account, tokenIdCounter - 1 )
 
     })
@@ -209,7 +308,9 @@ describe("SapoPerroCollection", function () {
 
       const { deploySp, mintCost, account } = await loadFixture( createContract )
 
-      await deploySp.mintSapoPerro( 50, { value: mintCost.mul(50)} )
+      await deploySp.addToWhiteList( account.address )
+
+      await deploySp.connect( account ).mintSapoPerro( 20, { value: mintCost.mul(20)} )
 
       expect( await deploySp.withdraw())
         .to.emit( account, anyValue )

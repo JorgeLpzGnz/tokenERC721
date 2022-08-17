@@ -13,13 +13,17 @@ contract SapoPerroCollection is ERC721, Ownable {
 
     uint256 public mintCost;
 
+    uint256 public maxPerTransaction = 20;
+
     uint256 public totalSupply = 10000;
+
+    Counters.Counter public tokenIdCounter;
+
+    mapping (address => bool) public whiteList;
 
     event MintSapoPerro( address to, uint256 tokenId);
 
     event Withdraw( address to, uint256 amount);
-
-    Counters.Counter public tokenIdCounter;
 
     constructor() ERC721('SapoPerroCollection', 'SPC'){
 
@@ -29,6 +33,22 @@ contract SapoPerroCollection is ERC721, Ownable {
 
         mintCost = 0.1 ether;
 
+    }
+
+    function addToWhiteList ( address _address ) external onlyOwner {
+
+        require( !whiteList[ _address ] , "Addres is already in the whitelist");
+
+        whiteList[ _address ] = true;
+
+    }
+
+    function deleteToWhiteList ( address _address ) external onlyOwner {
+
+        require( whiteList[ _address ], "Address not found");
+
+        delete whiteList[ _address ];
+        
     }
 
     function setBaseUri( string memory _baseUri) public onlyOwner{
@@ -45,9 +65,19 @@ contract SapoPerroCollection is ERC721, Ownable {
 
     }
 
+    function setMintCost ( uint256 _mintCost) external {
+
+        mintCost = _mintCost;
+
+    }
+
     function mintSapoPerro(uint256 _nftsAmount) external payable {
 
         require(msg.value == mintCost * _nftsAmount, 'incorrect value, check mintCost');
+
+        require(_nftsAmount <= maxPerTransaction, "can't mint more than 20 tokens per transation");
+
+        require( whiteList[msg.sender], 'Your not in the white list');
 
         for(uint256 i; i < _nftsAmount; i++){
             
